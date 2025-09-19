@@ -1,0 +1,66 @@
+name: build
+run-name: build-1.0.${{ github.run_number }}
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+    - 'main'
+permissions: write-all
+env:
+  DOCKERFILE: Dockerfile.macu
+  IMAGE_NAME: keybridge-request-broker
+
+jobs:
+  build:
+    name: build
+    runs-on:
+      group: linux-self-hosted
+    steps:
+    - uses: actions/checkout@v4
+    - uses: macu-devops/actions_metadata@v1
+      id: metadata
+      with:
+        token: ${{ github.token }}
+    - uses: macu-devops/actions_changelog@v1
+      id: changelog
+    - uses: macu-devops/actions_docker/build@v1
+      with:
+        registry-username: "${{ secrets.CRMACU_USERNAME }}"
+        registry-password: "${{ secrets.CRMACU_PASSWORD }}"
+        docker-file: "${{ env.DOCKERFILE }}"
+        image-name: "${{ env.IMAGE_NAME }}"
+        tags: |
+            "${{ steps.metadata.outputs.version }}"
+    - uses: macu-devops/actions_docker/push@v1
+      with:
+        registry-username: "${{ secrets.CRMACU_USERNAME }}"
+        registry-password: "${{ secrets.CRMACU_PASSWORD }}"
+        image-name: "${{ env.IMAGE_NAME }}"
+        tags: |
+            "${{ steps.metadata.outputs.version }}"
+    - uses: macu-devops/actions_github-releases/create@v1
+      with:
+        token: ${{ github.token }}
+        tag: ${{ steps.metadata.outputs.version }}
+        generate-notes: "true"
+    - uses: macu-devops/actions_github-releases/add-to-notes@v1
+      with:
+        token: ${{ github.token }}
+        tag: ${{ steps.metadata.outputs.version }}
+        prepend: "true"
+        release-notes: |
+          ${{ steps.changelog.outputs.release-notes }}
+    - uses: macu-devops/actions_github-releases/add-to-notes@v1
+      with:
+        token: ${{ github.token }}
+        tag: ${{ steps.metadata.outputs.version }}
+        release-notes: |
+          Build: [${{ steps.metadata.outputs.run-html-url }}](${{ steps.metadata.outputs.run-html-url }})
+    - uses: macu-devops/actions_octopus/createrelease@v1
+      with:
+        octopus-api-key: ${{ secrets.OCTOPUS_API_KEY }}
+        octopus-deploy-id: "devops_bagetter"
+        release-notes: |
+          ${{ steps.changelog.outputs.release-notes }}
+        version: "${{ steps.metadata.outputs.version }}"

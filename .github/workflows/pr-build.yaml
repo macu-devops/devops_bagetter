@@ -1,0 +1,28 @@
+name: pull
+on:
+  pull_request:
+permissions: write-all
+env:
+  DOCKERFILE: Dockerfile.macu
+  IMAGE_NAME: devops-bagetter
+jobs:
+  build:
+    name: build
+    runs-on:
+      group: linux-self-hosted
+    steps:
+    - uses: actions/checkout@v4
+    - uses: macu-devops/actions_metadata@v1
+      id: metadata
+      with:
+        token: ${{ github.token }}
+    - uses: macu-devops/actions_changelog@v1
+      id: changelog
+    - uses: macu-devops/actions_docker/build@v1
+      with:
+        registry-username: "${{ secrets.CRMACU_USERNAME }}"
+        registry-password: "${{ secrets.CRMACU_PASSWORD }}"
+        docker-file: "${{ env.DOCKERFILE }}"
+        image-name: "${{ env.IMAGE_NAME }}"
+        tags: |
+            "${{ steps.metadata.outputs.version }}"
